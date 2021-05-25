@@ -1,0 +1,7 @@
+.Rproj.user/
+.Rdata/
+.RData
+.Rhistory
+*.pdf
+*.txt
+acoes.json
