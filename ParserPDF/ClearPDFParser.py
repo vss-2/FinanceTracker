@@ -1,13 +1,18 @@
+from ClearPDFParser_old import listarDiretorio, main
+
+
 try:
     import pdfminer
     from subprocess import run
     from subprocess import DEVNULL
     from os import getcwd
     from os import listdir
+    from datetime import datetime
+    from time import strptime
 except ImportError:
     print('Pacote pdfminer não foi encontrado, tente executar: pip3 install pdfminer')
 
-class colors:
+class Colors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -17,14 +22,113 @@ class colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+class Nota:
+# Refatoração do outro arquivo
+
+    def __init__(self, vt, q, n, o, e, d, a):
+        self.valor_total = vt
+        self.negociacao = n
+        self.quantidade = q
+        self.operacao = o
+        self.empresa = e
+        self.data = d
+        self.arq = a
+
+    def setArq(self, arq):
+        self.arq = arq
+        return self.arq
+
+    def getValorTotal(self, arq):
+        index = 0
+        try:
+            index = arq.index('Valor Operação / Ajuste')+2
+            try:
+                # Valor da ação
+                if(type(arq[index][0]) == int):
+                    self.valor_total = self.quantidade * float(arq[index+2].replace(',', '.'))
+                    return
+            except:
+                # Nome de empresa
+                index += 2
+                self.valor_total = self.quantidade * float(arq[index+2].replace(',', '.'))
+                return
+        except:
+            index = -1
+            print('Erro ao procurar valor total!')
+            exit()
+        return 
+    
+    def getNegociacoes(self, arq):
+        self.negociacao = arq.count('1-BOVESPA')
+        return self.negociacao
+    
+    def getEmpresa(self, arq):
+        if self.negociacao > 0:
+
+            self.empresa = []
+            try:
+                index = arq.index('Valor Operação / Ajuste')+2
+            except:
+                print('\nMais de uma empresa não identificada!')
+                pass
+
+            for f in range(index, index+self.negociacao):
+                tratar_string = arq[f].replace('    ', '').replace('ON', '').replace('NM','').strip()
+                self.empresa.append(tratar_string)
+        else:
+            print('\nErro: nenhuma negociação identificada!')
+
+        return self.empresa
+
+    def getPrazoFix(self, arq):
+        try:
+            index = arq.index('Prazo Especificação do título')
+        except:
+            index = arq.index('Especificação do título')
+        return
+
+    def getQuantidade(self, arq):
+        self.quantidade = []
+        if self.negociacao > 0:
+            index = arq.index('Valor Operação / Ajuste')+2
+            try:
+                # Valor da ação
+                for _ in range(0, self.negociacao):
+                    # print('Ação', arq[index])
+                    if(type(int(arq[index][0])) == int):
+                        self.quantidade.append(int(arq[index]))
+                        index += 1
+                return self.quantidade
+            except:
+                # Nome de empresa
+                index += 2 if self.negociacao == 1 else + self.negociacao + 1
+                for _ in range(0, self.negociacao+1):
+                    # print('Nome', arq[index])
+                    if (arq[index] == ''):
+                        continue
+                    self.quantidade.append(int(arq[index]))
+                    index += 1
+                return self.quantidade
+
+        else:
+            print('\nErro: nenhuma negociação identificada!')
+        
+        return self.quantidade
+
+    def getData(self, arq):
+        index = arq.index('Data pregão')+2
+        self.data = datetime(*(strptime(arq[index], '%d/%m/%Y')[:6]))
+        return self.data
+
 def listarDiretorio():
     itens = list(filter(lambda f: f.endswith('pdf'), listdir(getcwd())))
+    
     for item in itens:
         if(item.endswith('pdf')):
-            print(colors.OKBLUE + str(itens.index(item)+1) + '. ' + item + colors.ENDC)
+            print(Colors.OKBLUE + str(itens.index(item)+1) + '. ' + item + Colors.ENDC)
     
     try:
-        i = input(colors.WARNING + 'Qual arquivo deseja extrair informações? \n(digite -1 caso queira extrair todos os arquivos)?\n' + colors.ENDC)
+        i = input(Colors.WARNING + 'Qual arquivo deseja extrair informações? \n(digite -1 caso queira extrair todos os arquivos)?\n' + Colors.ENDC)
         if type(i) != str:
             raise ValueError()
 
@@ -39,103 +143,30 @@ def listarDiretorio():
         print('A resposta não é um número!\nInput lido: {}'.format(type(i)))
         exit()
 
-def organizarPorEmpresa(todas):
-    d_todas = dict({})
-    print(colors.OKGREEN + 'Organizado:\n' + colors.ENDC)
-    # Adiciona chaves
-    for t in todas:
-        if t[1] not in d_todas:
-            d_todas.update({t[1]: []})
+def main(i_arq):
 
-    # Adiciona negociações
-    for t in todas:
-        d_todas[t[1]].append('Ordem de {} de {} no dia {} pelo valor total R${}{}'.format(t[0], t[1], t[2], t[3], t[4]))
-    
-    for d in d_todas.keys():
-        print(colors.WARNING + d + colors.ENDC)
-        for i in d_todas[d]:
-            print(colors.OKGREEN + '\t' + i + colors.ENDC)
-        print('\n')
-    
-    return
-
-def main():
-    i_arq = listarDiretorio()
-    
-    todas_neg = []
-    
     for i in i_arq:
-        qnt_acoes = 0
-        arr_acoes = []
-        arq = []
         
         input_arq = str(i)[:-3]+'txt'
         run(['pdf2txt.py', '-o', input_arq, i], stdout=None, stderr=DEVNULL)
+
         with open(input_arq, 'r') as tempTxt:
             arq = tempTxt.readlines()
 
-        # print(arq)
         arq = [f.strip() for f in arq]
 
-        try:
-            i = arq.index('Data pregão')+2
-            data = arq[i]
-        except ValueError:
-            print(colors.FAIL + 'Campo \'Data pregão\' não encontrado!' + colors.ENDC)
-            exit()
+        n = Nota(None, None, None, None, None, None, arq)
+    
+        print(n.getNegociacoes(n.arq))
+        print(n.getData(n.arq))
+        print(n.getQuantidade(n.arq))
+        print(n.getValorTotal(n.arq))
 
-        qnt_acoes = arq.count('1-BOVESPA')
-        
-        try: 
-            i = arq.index('D/C')+1
-        except ValueError:
-            print(colors.FAIL + 'Campo \'D/C\' não encontrado!' + colors.ENDC)
-            exit()
-
-        # Achar valor de compra
-        for r in range(i, i+qnt_acoes):
-            arr_acoes.append(arq[r].split(' '))
-
-        posterior = ''
-
-        # Achar ações (Empresa e Quantidade)
-        i = arq.index('Valor Operação / Ajuste')+2
-        for r in range(i, i+qnt_acoes):
-            arr_acoes[i-r].append(data)
-            # Empresa
-            arr_acoes[i-r].append(arq[r].replace('    ', '').replace('ON', '').replace('NM','').strip())
-            
-            # Caso de ordem não confirmada no mesmo dia
-            try:
-                if type(int(arr_acoes[i-r][-1][0])==int):
-                    arr_acoes[i-r].pop()
-                    try:
-                        especificacao = arq[arq.index('Prazo Especificação do título')+1] 
-                    except:
-                        especificacao = arq[arq.index('Especificação do título')+1]
-                    arr_acoes[i-r].append(especificacao.replace('    ', '').replace('ON', '').replace('NM','').strip())
-                    posterior = ', confirmada posteriormente'
-            except:
-                # print(arr_acoes[i-r])
-                pass
-                
-            # Quantidade
-            # print(float(arq[r+qnt_acoes+1].replace(',', '.')))
-
-        # print(arr_acoes)
-
-        d = dict({})
-        for x in arr_acoes:
-            op = 'venda' if x[1] == 'D' else 'compra'
-            # print(x)
-            d.update({x[3]: 'Ordem de {} de {} no dia {} pelo valor total R${}{}'.format(op, x[3], x[2], x[0], posterior)})
-            todas_neg.append([op, x[3], x[2], x[0], posterior])
-
-        run(['rm', input_arq])
-        
-        # print(d)
-    organizarPorEmpresa(todas_neg)
-    return
+        # n.getNegociacoes(n.arq)
+        # n.getData(n.arq)
+        # n.getQuantidade(n.arq)
+        # n.getValorTotal(n.arq)
 
 if __name__ == '__main__':
-    main()
+    lD = listarDiretorio()
+    main(lD)

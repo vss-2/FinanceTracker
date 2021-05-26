@@ -5,3 +5,5 @@
 *.pdf
 *.txt
 acoes.json
+*.pyc
+__pycache__/
