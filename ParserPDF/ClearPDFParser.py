@@ -1,6 +1,3 @@
-from ClearPDFParser_old import listarDiretorio, main
-
-
 try:
     import pdfminer
     from subprocess import run
@@ -40,20 +37,27 @@ class Nota:
 
     def getValorTotal(self, arq):
         index = 0
+        self.valor_total = []
         try:
             index = arq.index('Valor Operação / Ajuste')+2
             try:
                 # Valor da ação
-                if(type(arq[index][0]) == int):
-                    self.valor_total = self.quantidade * float(arq[index+2].replace(',', '.'))
-                    return
+                if(type(int(arq[index][0])) == int):
+                    for f in range(0, self.negociacao):
+                        print('Ação', arq[index])
+                        self.valor_total.append(self.quantidade[f] * float(arq[index].replace(',', '.')))
+                    index += 1
+                    return self.valor_total
             except:
                 # Nome de empresa
-                index += 2
-                self.valor_total = self.quantidade * float(arq[index+2].replace(',', '.'))
-                return
+                index += 2 + self.negociacao
+                for f in range(0, self.negociacao):
+                    index += 1
+                    print('Nome', arq[index])
+                    self.valor_total.append(self.quantidade[f] * float(arq[index].replace(',', '.')))
+                return self.valor_total
         except:
-            index = -1
+            # index = -1
             print('Erro ao procurar valor total!')
             exit()
         return 
