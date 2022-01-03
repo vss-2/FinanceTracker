@@ -22,7 +22,7 @@ function exportarValores(){
 			})
 		});
 	}
-	JSON.stringify(output);
+	console.log(JSON.stringify(output));
 }
 
 // Observer feito para monitorar http://polygonscan.com
